@@ -1,0 +1,477 @@
+你好~我有一個問題想問你
+--------------------------
+你好！請問有什麼問題我可以幫忙解答呢？
+--------------------------
+這是之前你教我的code，我有一點小問題，我接下來會先複製你教的code上來，再陳述問題，在我陳述問題前，不要打斷我
+--------------------------
+好的，我會等你講完問題再提供回答。請放心說明你的問題。
+--------------------------
+這是你提供的code：from sklearn.tree import DecisionTreeRegressor
+from sklearn.model_selection import train_test_split
+
+Ball_x = []
+Ball_y = []
+Speed_x = []
+Speed_y = []
+Direction = []
+Bricks_x = []
+Bricks_y = []
+
+for data in data_set:
+    for i, sceneInfo in enumerate(data['1P']["scene_info"][2:-3]):
+        Ball_x.append(data['1P']['scene_info'][i+1]["ball"][0])
+        Ball_y.append(data['1P']['scene_info'][i+1]["ball"][1])
+        Speed_x.append(data['1P']['scene_info'][i+1]["ball"][0] - data['1P']['scene_info'][i]["ball"][0])
+        Speed_y.append(data['1P']['scene_info'][i+1]["ball"][1] - data['1P']['scene_info'][i]["ball"][1])
+        if Speed_x[-1] > 0:
+            if Speed_y[-1] > 0:
+                Direction.append(0)
+            else:
+                Direction.append(1)
+        else:
+            if Speed_y[-1] > 0:
+                Direction.append(2)
+            else:
+                Direction.append(3)
+        Bricks_x.append(data['1P']['scene_info'][i+1]["bricks"][0])
+        Bricks_y.append(data['1P']['scene_info'][i+1]["bricks"][1])
+
+X_labeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction))
+Y_labeled = Position_pred
+
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x, Bricks_y))
+
+x_train_l, x_test_l, y_train_l, y_test_l = train_test_split(X_labeled, Y_labeled, test_size=0.2)
+
+model = DecisionTreeRegressor(criterion='squared_error', max_depth=8000, splitter='best')
+model.fit(x_train_l, y_train_l)
+
+# 使用已標記的數據來進行模型評估
+print('Score on labeled data:', model.score(x_test_l, y_test_l))
+
+# 使用半監督式學習來進行預測
+y_pred_unlabeled = model.predict(X_unlabeled)
+Y_labeled = np.concatenate((Y_labeled, y_pred_unlabeled))
+
+# 使用已標記和新增標記的數據來重新訓練模型
+x_train, x_test, y_train, y_test = train_test_split(np.concatenate((X_labeled, X_unlabeled)), Y_labeled, test_size=0.2)
+
+model.fit(x_train, y_train)
+
+# 使用已標記和新增標記的數據來進行模型評估
+print('Score on labeled and unlabeled data:', model.score(x_test, y_test))
+--------------------------
+好的，請問你的問題是什麼呢？
+--------------------------
+我們原本在討論半監督式學習，但這裡有個問題：我的structure scene info 的形式是{
+  "frame": 0,
+  "status": "GAME_ALIVE",
+  "ball": [ 93, 395],
+  "ball_served": false,
+  "platform": [ 75, 400],
+  "bricks": [
+    [ 50, 60],
+    ...,
+    [125, 80]
+  ],
+  "hard_bricks": [
+    [ 35, 50],
+    ...,
+    [135, 90]
+  ]
+}，顯然，我的bricks和hard bricks沒辦法符合X_train的格式，你認為我應該如何解決這個問題呢？(磚塊的上限是100個)
+--------------------------
+這個問題可以透過轉換 Bricks 資料的方式解決。可以使用 numpy 的 zeros 函數創建一個形狀為 (n, 100) 的矩陣，其中 n 是你的資料集中的樣本數，然後將磚塊位置資料填入矩陣中。
+
+下面是一個範例程式碼，可以將 data_set 中的磚塊資料轉換成可以用於訓練模型的形式：
+
+python
+Copy code
+import numpy as np
+
+# 創建形狀為 (n, 100) 的矩陣
+bricks_data = np.zeros((n, 100))
+
+# 填充矩陣
+for i, data in enumerate(data_set):
+    for j, brick in enumerate(data['1P']['scene_info'][2:-3]['bricks']):
+        bricks_data[i, j*2] = brick[0]
+        bricks_data[i, j*2+1] = brick[1]
+
+# 將新的資料加入 X_unlabeled
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, bricks_data))
+
+
+這樣，你就可以將磚塊位置資料加入到 X_unlabeled 中，並用於訓練模型了。
+--------------------------
+抱歉，但for j, brick in enumerate(data['1P']['scene_info'][2:-3]['bricks']):是否應該改成for j, brick in enumerate(data['1P']['scene_info'][2:]['bricks'])?
+--------------------------
+不用抱歉，你提出的問題很重要。你是對的，我之前給的程式碼有誤。如果要將 bricks 和 hard_bricks 加入到 X_unlabeled 中，應該使用以下的程式碼：
+
+python
+Copy code
+for data in data_set:
+    for i, sceneInfo in enumerate(data['1P']["scene_info"][2:-3]):
+        Ball_x.append(data['1P']['scene_info'][i+1]["ball"][0])
+        Ball_y.append(data['1P']['scene_info'][i+1]["ball"][1])
+        Speed_x.append(data['1P']['scene_info'][i+1]["ball"][0] - data['1P']['scene_info'][i]["ball"][0])
+        Speed_y.append(data['1P']['scene_info'][i+1]["ball"][1] - data['1P']['scene_info'][i]["ball"][1])
+        if Speed_x[-1] > 0:
+            if Speed_y[-1] > 0:
+                Direction.append(0)
+            else:
+                Direction.append(1)
+        else:
+            if Speed_y[-1] > 0:
+                Direction.append(2)
+            else:
+                Direction.append(3)
+        Bricks_x = []
+        Bricks_y = []
+        for j, brick in enumerate(data['1P']['scene_info'][i]["bricks"]):
+            Bricks_x.append(brick[0])
+            Bricks_y.append(brick[1])
+        for j, brick in enumerate(data['1P']['scene_info'][i]["hard_bricks"]):
+            Bricks_x.append(brick[0])
+            Bricks_y.append(brick[1])
+        X_unlabeled.append([Ball_x[-1], Ball_y[-1], Speed_x[-1], Speed_y[-1], Direction[-1]] + Bricks_x + Bricks_y)
+
+
+這樣就可以將所有的磚塊資訊都加入到 X_unlabeled 中，方便進行半監督式學習。
+--------------------------
+我提供的structure中，一frame的資料會有brick的多個x, y陣列，我們應該要將一frame中的每個磚塊資訊都列入考慮，而非只列入brick[0]、brick[1]，你覺得呢
+--------------------------
+是的，您是對的。每個frame中的磚塊都應該被列入考慮，而不僅僅是第一個磚塊的座標。因此，在收集磚塊資訊時，您可以使用以下程式碼將所有磚塊的座標分別儲存在不同的list中，並將這些list與Ball_x、Ball_y、Speed_x、Speed_y和Direction合併成一個矩陣：
+
+css
+Copy code
+Bricks_x = []
+Bricks_y = []
+Hard_bricks_x = []
+Hard_bricks_y = []
+
+for i, sceneInfo in enumerate(data['1P']["scene_info"][2:-3]):
+    for brick in sceneInfo["bricks"]:
+        Bricks_x.append(brick[0])
+        Bricks_y.append(brick[1])
+    for hard_brick in sceneInfo["hard_bricks"]:
+        Hard_bricks_x.append(hard_brick[0])
+        Hard_bricks_y.append(hard_brick[1])
+
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x, Bricks_y, Hard_bricks_x, Hard_bricks_y))
+
+
+這將將磚塊的座標作為新的特徵加入您的訓練資料中，以更好地預測板子的移動位置。
+--------------------------
+你好聰明
+--------------------------
+謝謝你的夸獎，有任何需要幫忙的地方可以繼續問我喔！
+--------------------------
+可以用繁忠回答嗎
+--------------------------
+當然可以，歡迎繼續提問！
+--------------------------
+你回答的"for i, sceneInfo in enumerate(data['1P']["scene_info"][2:-3]):"是否應該改成"for i, sceneInfo in enumerate(data['1P']["scene_info"][2:]):"?
+--------------------------
+對，你是對的。將"for i, sceneInfo in enumerate(data['1P']["scene_info"][2:-3]):" 改成 "for i, sceneInfo in enumerate(data['1P']["scene_info"][2:]):"，才能確保每個frame的所有brick都被考慮到。
+--------------------------
+你好~根據你給的code，我執行出了下面的錯誤訊息：Traceback (most recent call last):
+  File "d:\111_2\ML_Learning\Arkanoid_testing\ml_train.py", line 54, in <module>
+    X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x, Bricks_y, H_Bricks_x, H_Bricks_y))
+  File "<__array_function__ internals>", line 200, in column_stack
+  File "C:\Users\GF75\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\site-packages\numpy\lib\shape_base.py", line 656, in column_stack
+    return _nx.concatenate(arrays, 1)
+  File "<__array_function__ internals>", line 200, in concatenate
+ValueError: all the input array dimensions except for the concatenation axis must match exactly, but along dimension 0, the array at index 0 has size 40743 and the array at index 5 has size 123089 這是甚麼意思呢
+--------------------------
+這個錯誤訊息的意思是說，在將 Ball_x、Ball_y、Speed_x、Speed_y、Direction、Bricks_x、Bricks_y、H_Bricks_x、H_Bricks_y 合併成一個多維陣列時，發現除了要合併的那個軸以外，其他軸的維度必須完全相同，但是在第0個軸上，Ball_x 等各個陣列的大小不同。
+
+這個問題很可能是因為你的 Ball_x、Ball_y、Speed_x、Speed_y、Direction、Bricks_x、Bricks_y、H_Bricks_x、H_Bricks_y 陣列在某些情況下的長度不同所導致的。因此，你需要檢查這些陣列在你的程式中的使用方式，並確保它們的大小是一致的。
+--------------------------
+因為我的Bricks和H_Bricks的陣列長度會隨著frame不同而改變，你有甚麼修改建議嗎，Bricks和Hard_Bricks的上限都是100個
+--------------------------
+如果Bricks和Hard_Bricks的上限都是100個，你可以將每個磚塊的x和y座標展平為一維數組，再將所有磚塊的x和y座標合併為一個長度為200的一維數組。
+
+具體地說，你可以使用以下的方式將Bricks和Hard_Bricks中的所有磚塊的x和y座標展平：
+
+python
+Copy code
+bricks_x = []
+bricks_y = []
+for brick in scene_info['bricks']:
+    bricks_x.extend(brick)
+    bricks_y.extend([brick[1]] * 2)
+hard_bricks_x = []
+hard_bricks_y = []
+for brick in scene_info['hard_bricks']:
+    hard_bricks_x.extend(brick)
+    hard_bricks_y.extend([brick[1]] * 2)
+
+
+其中，bricks_x是所有磚塊的x座標的展平結果，bricks_y是所有磚塊的y座標的展平結果，hard_bricks_x和hard_bricks_y的意義與bricks_x和bricks_y相同，只不過它們是Hard_Bricks中所有磚塊的展平結果。
+
+接下來，你可以將Ball_x、Ball_y、Speed_x、Speed_y、Direction、bricks_x、bricks_y、hard_bricks_x和hard_bricks_y合併為一個特徵矩陣，代碼如下：
+
+python
+Copy code
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, bricks_x[:200], bricks_y[:200], hard_bricks_x[:200], hard_bricks_y[:200]))
+
+
+這樣就可以保證所有數組的維度都相同了。
+--------------------------
+謝謝 我試試看:)
+--------------------------
+不客氣，如果還有其他問題，歡迎隨時提出。
+--------------------------
+我根據你的建議改動後得到這個錯誤，你可以解決嗎?[Running] python -u "d:\111_2\ML_Learning\Arkanoid_testing\ml_train.py"
+Traceback (most recent call last):
+  File "d:\111_2\ML_Learning\Arkanoid_testing\ml_train.py", line 54, in <module>
+    X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x, Bricks_y, H_Bricks_x, H_Bricks_y))
+  File "<__array_function__ internals>", line 200, in column_stack
+  File "C:\Users\GF75\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\site-packages\numpy\lib\shape_base.py", line 656, in column_stack
+    return _nx.concatenate(arrays, 1)
+  File "<__array_function__ internals>", line 200, in concatenate
+ValueError: all the input array dimensions except for the concatenation axis must match exactly, but along dimension 0, the array at index 0 has size 40743 and the array at index 5 has size 246178
+
+--------------------------
+根據錯誤訊息，這是因為 Ball_x、Ball_y、Speed_x、Speed_y、Direction、Bricks_x、Bricks_y 和 H_Bricks_x、H_Bricks_y 的維度不匹配導致的。
+
+你可以使用 NumPy 的 pad 函數將 Bricks_x、Bricks_y、H_Bricks_x 和 H_Bricks_y 補齊到 100 的長度，然後再進行合併。以下是示範程式碼：
+
+python
+Copy code
+# 初始化陣列
+Ball_x = np.array([])
+Ball_y = np.array([])
+Speed_x = np.array([])
+Speed_y = np.array([])
+Direction = np.array([])
+Bricks_x = np.zeros((100, len(data['1P']['scene_info'][0]['bricks'])))
+Bricks_y = np.zeros((100, len(data['1P']['scene_info'][0]['bricks'])))
+H_Bricks_x = np.zeros((100, len(data['1P']['scene_info'][0]['hard_bricks'])))
+H_Bricks_y = np.zeros((100, len(data['1P']['scene_info'][0]['hard_bricks'])))
+
+# 處理資料
+for i, sceneInfo in enumerate(data['1P']['scene_info'][2:]):
+    Ball_x = np.append(Ball_x, sceneInfo['ball'][0])
+    Ball_y = np.append(Ball_y, sceneInfo['ball'][1])
+    Speed_x = np.append(Speed_x, sceneInfo['ball_speed'][0])
+    Speed_y = np.append(Speed_y, sceneInfo['ball_speed'][1])
+    Direction = np.append(Direction, sceneInfo['platform'][0] - sceneInfo['ball'][0])
+    for j, brick in enumerate(sceneInfo['bricks']):
+        Bricks_x[j, i] = brick[0]
+        Bricks_y[j, i] = brick[1]
+    for j, hard_brick in enumerate(sceneInfo['hard_bricks']):
+        H_Bricks_x[j, i] = hard_brick[0]
+        H_Bricks_y[j, i] = hard_brick[1]
+
+# 將 bricks 和 hard_bricks 的資料補齊至 100 個
+Bricks_x = np.pad(Bricks_x, ((0, 100 - Bricks_x.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+Bricks_y = np.pad(Bricks_y, ((0, 100 - Bricks_y.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+H_Bricks_x = np.pad(H_Bricks_x, ((0, 100 - H_Bricks_x.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+H_Bricks_y = np.pad(H_Bricks_y, ((0, 100 - H_Bricks_y.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+
+# 合併資料
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x.flatten(), Bricks_y.flatten(), H_Bricks_x.flatten(), H_Bricks_y.flatten()))
+
+
+這樣應該就可以正常執行了，請試試看
+--------------------------
+因為我的data是源自dataset中，我無法將初始化放在你說的位置，可以幫我想辦法嗎？path = ".\log"
+allFile = os.listdir(path)
+data_set = []
+for file in allFile:
+    with open(os.path.join(path,file),"rb") as f:
+        data_set.append(pickle.load(f))
+
+
+# feature
+Ball_x = []
+Ball_y = []
+Speed_x = []
+Speed_y = []
+Direction = []
+Bricks_x = np.zeros((100, len(data['1P']['scene_info'][0]['bricks'])))
+Bricks_y = np.zeros((100, len(data['1P']['scene_info'][0]['bricks'])))
+H_Bricks_x = np.zeros((100, len(data['1P']['scene_info'][0]['hard_bricks'])))
+H_Bricks_y = np.zeros((100, len(data['1P']['scene_info'][0]['hard_bricks'])))
+
+for data in data_set:
+    for i, sceneInfo in enumerate(data['1P']["scene_info"][2:]):
+        Ball_x.append(data['1P']['scene_info'][i+1]["ball"][0])
+        Ball_y.append(data['1P']['scene_info'][i+1]["ball"][1])
+        Speed_x.append(data['1P']['scene_info'][i+1]["ball"][0] - data['1P']['scene_info'][i]["ball"][0])
+        Speed_y.append(data['1P']['scene_info'][i+1]["ball"][1] - data['1P']['scene_info'][i]["ball"][1])
+        if Speed_x[-1] > 0:
+            if Speed_y[-1] > 0:
+                Direction.append(0)
+            else:
+                Direction.append(1)
+        else:
+            if Speed_y[-1] > 0:
+                Direction.append(2)
+            else:
+                Direction.append(3)
+        for j, brick in enumerate(sceneInfo['bricks']):
+            Bricks_x[j, i] = brick[0]
+            Bricks_y[j, i] = brick[1]
+        for j, hard_brick in enumerate(sceneInfo['hard_bricks']):
+            H_Bricks_x[j, i] = hard_brick[0]
+            H_Bricks_y[j, i] = hard_brick[1]
+
+# 將 bricks 和 hard_bricks 的資料補齊至 100 個
+Bricks_x = np.pad(Bricks_x, ((0, 100 - Bricks_x.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+Bricks_y = np.pad(Bricks_y, ((0, 100 - Bricks_y.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+H_Bricks_x = np.pad(H_Bricks_x, ((0, 100 - H_Bricks_x.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+H_Bricks_y = np.pad(H_Bricks_y, ((0, 100 - H_Bricks_y.shape[0]), (0, 0)), mode='constant', constant_values=np.nan)
+
+
+X_labeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction))
+X_unlabeled = np.column_stack((Ball_x, Ball_y, Speed_x, Speed_y, Direction, Bricks_x, Bricks_y, H_Bricks_x, H_Bricks_y))
+--------------------------
+我們可以在一開始讀取 dataset 前，先對 Bricks_x、Bricks_y、H_Bricks_x、H_Bricks_y 進行初始化，這樣可以保證每次處理新的 data 時，這些陣列都是全新的。
+
+你可以透過下列的方式初始化：
+
+bash
+Copy code
+Bricks_x = np.zeros((100, 0))
+Bricks_y = np.zeros((100, 0))
+H_Bricks_x = np.zeros((100, 0))
+H_Bricks_y = np.zeros((100, 0))
+
+
+這樣就可以確保在每次對 data 進行處理時，這些陣列都是空的。
+
+修改後的程式碼如下：
+
+python
+Copy code
+import os
+import pickle
+import numpy as np
+
+path = ".\log"
+allFile = os.listdir(path)
+data_set = []
+
+# feature
+Ball_x = []
+Ball_y = []
+Speed_x = []
+Speed_y = []
+Direction = []
+Bricks_x = np.zeros((100, 0))
+Bricks_y = np.zeros((100, 0))
+H_Bricks_x = np.zeros((100, 0))
+H_Bricks_y = np.zeros((100, 0))
+
+for file in allFile:
+    with open(os.path.join(path,file),"rb") as f:
+        data_set.append(pickle.load(f))
+
+for data in data_set:
+    for i, sceneInfo in enumerate(data['1P']["scene_info"][2:]):
+        Ball_x.append(data['1P']['scene_info'][i+1]["ball"][0])
+        Ball_y.append(data['1P']['scene_info'][i+1]["ball"][1])
+        Speed_x.append(data['1P']['scene_info'][i+1]["ball"][0] - data['1P']['scene_info'][i]["ball"][0])
+        Speed_y.append(data['1P']['scene_info'][i+1]["ball"][1] - data['1P']['scene_info'][i]["ball"][1])
+        if Speed_x[-1] > 0:
+            if Speed_y[-1] > 0:
+                Direction.append(0)
+            else:
+                Direction.append(1)
+        else:
+            if Speed_y[-1] > 0:
+                Direction.append(2)
+            else:
+                Direction.append(3)
+        bricks = sceneInfo.get('bricks', [])
+        hard_bricks = sceneInfo.get('hard_bricks', [])
+        for j, brick in enumerate(bricks):
+            Bricks_x[j, i:i+1] = brick[0]
+            Bricks_y[j, i:i+1] = brick[1]
+        for j, hard_brick in enumerate(hard_bricks):
+            H_Bricks_x[j, i:i+1] = hard_brick[0]
+            H_Bricks_y[j, i:i+1] = hard_brick[1]
+
+# 將 bricks 和 hard_bricks 的資料補齊至 100 個
+Bricks_x = np.pad(Bricks_x, ((0, 0), (0, max(0, 100 - Bricks_x.shape[1]))), mode='constant', constant_values=np.nan)
+Bricks_y = np.pad(Bricks_y, ((0, 0), (0, max(0, 100 - Bricks_y.shape[1]))), mode='constant', constant_values=np.nan)
+H_Bricks_x = np
+
+--------------------------
+抱歉，你剛剛寫到一半中斷了，可以繼續嗎
+
+--------------------------
+非常抱歉，我繼續上面的回答。
+
+因為你的資料來自dataset，無法在一開始就知道長度，可以使用以下的方法在每次迭代時，先檢查目前的資料長度，然後再將新的資料放到對應的位置。
+
+scss
+Copy code
+# feature
+Ball_x = []
+Ball_y = []
+Speed_x = []
+Speed_y = []
+Direction = []
+Bricks_x = np.zeros((100, 0))
+Bricks_y = np.zeros((100, 0))
+H_Bricks_x = np.zeros((100, 0))
+H_Bricks_y = np.zeros((100, 0))
+
+for data in data_set:
+    for i, sceneInfo in enumerate(data['1P']["scene_info"][2:]):
+        Ball_x.append(data['1P']['scene_info'][i+1]["ball"][0])
+        Ball_y.append(data['1P']['scene_info'][i+1]["ball"][1])
+        Speed_x.append(data['1P']['scene_info'][i+1]["ball"][0] - data['1P']['scene_info'][i]["ball"][0])
+        Speed_y.append(data['1P']['scene_info'][i+1]["ball"][1] - data['1P']['scene_info'][i]["ball"][1])
+        if Speed_x[-1] > 0:
+            if Speed_y[-1] > 0:
+                Direction.append(0)
+            else:
+                Direction.append(1)
+        else:
+            if Speed_y[-1] > 0:
+                Direction.append(2)
+            else:
+                Direction.append(3)
+        # 檢查 Bricks 和 H_Bricks 的長度是否和目前的資料一致，如果不一致就進行擴展
+        if len(sceneInfo['bricks']) != Bricks_x.shape[1]:
+            Bricks_x = np.pad(Bricks_x, ((0, 0), (0, len(sceneInfo['bricks']) - Bricks_x.shape[1])), mode='constant', constant_values=np.nan)
+            Bricks_y = np.pad(Bricks_y, ((0, 0), (0, len(sceneInfo['bricks']) - Bricks_y.shape[1])), mode='constant', constant_values=np.nan)
+        if len(sceneInfo['hard_bricks']) != H_Bricks_x.shape[1]:
+            H_Bricks_x = np.pad(H_Bricks_x, ((0, 0), (0, len(sceneInfo['hard_bricks']) - H_Bricks_x.shape[1])), mode='constant', constant_values=np.nan)
+            H_Bricks_y = np.pad(H_Bricks_y, ((0, 0), (0, len(sceneInfo['hard_bricks']) - H_Bricks_y.shape[1])), mode='constant', constant_values=np.nan)
+        for j, brick in enumerate(sceneInfo['bricks']):
+            Bricks_x[j, i] = brick[0]
+            Bricks_y[j, i] = brick[1]
+        for j, hard_brick in enumerate(sceneInfo['hard_bricks']):
+            H_Bricks_x[j, i] = hard_brick[0]
+            H_Bricks_y[j, i] = hard_brick[1]
+
+# 將 bricks 和 hard_bricks 的資料補齊至 100 個
+Bricks_x = np.pad(Bricks_x, ((0, 0), (0, 100 - Br
+
+--------------------------
+抱歉，如果我的Bricks_x和Bricks_y、H_Bricks_x和H_Bricks_y沒有100這個上限，我應該怎麼修改呢?如我跟你提過的structure，每一個ball的資料點都會對應到Bricks = [, ]的陣列
+--------------------------
+如果 Bricks_x 和 Bricks_y，以及 H_Bricks_x 和 H_Bricks_y 沒有固定的上限，你可以在使用 np.zeros 來初始化它們時，使用 ball 的資料點來決定它們的形狀，例如：
+
+css
+Copy code
+Bricks_x = np.zeros((len(data_set[0]['1P']['scene_info'][0]['bricks']), len(data_set[0]['1P']['scene_info'])))
+Bricks_y = np.zeros((len(data_set[0]['1P']['scene_info'][0]['bricks']), len(data_set[0]['1P']['scene_info'])))
+H_Bricks_x = np.zeros((len(data_set[0]['1P']['scene_info'][0]['hard_bricks']), len(data_set[0]['1P']['scene_info'])))
+H_Bricks_y = np.zeros((len(data_set[0]['1P']['scene_info'][0]['hard_bricks']), len(data_set[0]['1P']['scene_info'])))
+
+
+這樣就可以將 Bricks_x 和 Bricks_y，以及 H_Bricks_x 和 H_Bricks_y 的形狀初始化成對應到 ball 的資料點的形狀。接下來，在迭代時，你需要將每個 ball 對應到的 Bricks_x 和 Bricks_y，以及 H_Bricks_x 和 H_Bricks_y 填入正確的位置即可。
+--------------------------
+接下來該怎麼寫呢
+
+--------------------------
+​
+--------------------------
+NEW
