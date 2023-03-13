@@ -12,7 +12,7 @@ class MLPlay:
         self.previous_ball = (0, 0)
        
 
-        with open(os.path.join(os.path.dirname(__file__),'model.pickle'),'rb') as f:
+        with open(os.path.join(os.path.dirname(__file__),'save','model.pickle'),'rb') as f:
             self.model = pickle.load(f)
     
     def update(self, scene_info, *args, **kwargs):
