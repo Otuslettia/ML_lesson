@@ -5,7 +5,6 @@ The template of the main script of the machine learning process
 import pickle
 import os
 import time
-import random
 
 class MLPlay:
     def __init__(self, *args, **kwargs):
@@ -13,12 +12,15 @@ class MLPlay:
         Constructor
         """
         self.ball_served = False
-        self.previous_ball = (0, 0)     
-        self.pred = 100                 # Prediction of board x axis location
+        self.previous_ball = (0, 0)  
         self.platform_y = 400           # Position of board y axis
         self.ball_speed_y = 7           # Ball vertical speed
         self.window_width = 200         # Width of the game window 
-        
+        self.platform_x = 75           # 球的移動方向 False 為往上，True為往下，代表要接球
+        self.platform_width = 40
+        self.pred = [200]
+        self.count = 0
+
         self._ml_names = ["1P"]
         game_progress = {
             "record_format_version": 2
@@ -30,42 +32,39 @@ class MLPlay:
             }
         self._game_progress = game_progress
 
-    def generate_random_number(self):
-        return random.randint(-20, 20)
-
     def update(self, scene_info, *args, **kwargs):
         
-        if (scene_info["status"] == "GAME_OVER" or
-                scene_info["status"] == "GAME_PASS"):
+        if scene_info["status"] == "GAME_OVER" :
+            for i in range(self.count-len(self.pred)-1):
+                platformx = self.pred[-1]
+                self.pred.append(platformx)
+            self.pred.append(self.previous_ball[0])
+            self.count = 0 # 歸零
+            self.clear_list()
             return "RESET"
-
+        elif scene_info["status"] == "GAME_PASS":
+            self.count = 0
+            self.record(scene_info, 'NONE')
+            self.flush_to_file()
+        
         if not self.ball_served:            
             self.ball_served = True
             self.previous_ball = scene_info["ball"]
-            command = "SERVE_TO_RIGHT"      # You can change the direction to serve ball
+            command = "SERVE_TO_LEFT"      # You can change the direction to serve ball
         else:
-            scene_info["status"] = "GAME_ALIVE"
-            Ball_x = scene_info["ball"][0]
-            Ball_y = scene_info["ball"][1]
-            Speed_x = scene_info["ball"][0] - self.previous_ball[0]
-            Speed_y = scene_info["ball"][1] - self.previous_ball[1]
-            windows_y_length = 400
-            if (Speed_y == 0): Speed_y = 1
-            x_p = Ball_x + ((windows_y_length - Ball_y)//Speed_y) * Speed_x
-            section = (x_p // self.window_width)
-            if (section % 2 == 0):
-                x_p = abs(x_p - self.window_width*section)
-            else : x_p = self.window_width - abs(x_p - self.window_width*section)
-            ran = self.generate_random_number()
-            x_p += ran
-            if (scene_info["platform"][0]) < x_p :
-                command = "MOVE_RIGHT"
-            elif (scene_info["platform"][0]) > x_p:
-                command = "MOVE_LEFT"
+            if self.previous_ball[1] == 395 and scene_info['ball'][1]-self.previous_ball[1] < 0:  # 球y軸為395，且方向向上
+                self.count += 1
+            if self.count > len(self.pred):
+                command = 'NONE'
             else:
-                command = "NONE"
-            pass
+                if self.pred[self.count-1]-18 > scene_info['platform'][0]:  # -20讓球不要在邊邊被打到
+                    command = 'MOVE_RIGHT'
+                elif self.pred[self.count-1]-12 < scene_info['platform'][0]:
+                    command = 'MOVE_LEFT'
+                else:
+                    command = 'NONE'
         self.previous_ball = scene_info["ball"]
+
         # Pass scene_info and command to generate data
         self.record(scene_info, command)
         return command
@@ -74,7 +73,6 @@ class MLPlay:
         """
         Reset the status
         """
-        self.flush_to_file()
         self.ball_served = False
 
     def record(self, scene_info_dict: dict, cmd_dict: dict):
@@ -91,13 +89,15 @@ class MLPlay:
         Flush the stored objects to the file
         """
         filename = time.strftime("%Y-%m-%d_%H-%M-%S") + ".pickle"
-        if not os.path.exists(os.path.dirname(__file__) + "/log"):
-            os.makedirs(os.path.dirname(__file__) + "/log")
-        filepath = os.path.join(os.path.dirname(__file__),"./log/" + filename)
+        if not os.path.exists(os.path.dirname(__file__) + "/smart_data"):
+            os.makedirs(os.path.dirname(__file__) + "/smart_data")
+        filepath = os.path.join(os.path.dirname(__file__),"./smart_data/" + filename)
         # Write pickle file
         with open(filepath, "wb") as f:
             pickle.dump(self._game_progress, f)
+        self.clear_list()
 
+    def clear_list(self):
         # Clear list
         for name in self._ml_names:
             target_slot = self._game_progress[name]
